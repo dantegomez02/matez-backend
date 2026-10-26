@@ -1,6 +1,6 @@
-export type ProductCategory = 'Mates' | 'Termos' | 'Bombillas' | 'Materas';
+export type ProductCategory = 'Mates' | 'Termos' | 'Bombillas' | 'Materas' | 'Vasos' | (string & {});
 
-export const VALID_CATEGORIES: ProductCategory[] = ['Mates', 'Termos', 'Bombillas', 'Materas'];
+export const DEFAULT_CATEGORIES = ['Mates', 'Termos', 'Bombillas', 'Materas', 'Vasos'];
 
 export interface Product {
   id: number;
@@ -33,7 +33,7 @@ export function validateProductData(data: Partial<CreateProductInput>): void {
     throw new Error('El precio del producto debe ser un número mayor a cero.');
   }
 
-  if (!data.cat || !VALID_CATEGORIES.includes(data.cat as ProductCategory)) {
-    throw new Error(`La categoría debe ser una de las siguientes: ${VALID_CATEGORIES.join(', ')}.`);
+  if (!data.cat || typeof data.cat !== 'string' || data.cat.trim().length === 0) {
+    throw new Error('La categoría del producto es requerida.');
   }
 }

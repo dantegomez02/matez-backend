@@ -69,11 +69,25 @@ export class SupabaseProductRepository implements IProductRepository {
     if (product.descripcion !== undefined) payload.descripcion = product.descripcion;
     if (product.material !== undefined) payload.material = product.material;
 
-    const { data, error } = await this.client
+    let { data, error } = await this.client
       .from('productos')
       .insert(payload)
       .select()
       .single();
+
+    // Si falla porque las columnas 'descripcion' o 'material' no existen aún en Supabase:
+    if (error && (error.message?.includes('descripcion') || error.message?.includes('material') || error.code === 'PGRST204')) {
+      console.warn('⚠️ Las columnas descripcion/material no están en la tabla productos. Insertando con columnas base...');
+      delete payload.descripcion;
+      delete payload.material;
+      const retry = await this.client
+        .from('productos')
+        .insert(payload)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('Error en SupabaseProductRepository.create:', error);
@@ -84,12 +98,28 @@ export class SupabaseProductRepository implements IProductRepository {
   }
 
   async update(id: number, fields: UpdateProductInput): Promise<Product> {
-    const { data, error } = await this.client
+    let { data, error } = await this.client
       .from('productos')
       .update(fields)
       .eq('id', id)
       .select()
       .single();
+
+    // Fallback defensivo si falla por columnas inexistentes
+    if (error && (error.message?.includes('descripcion') || error.message?.includes('material') || error.code === 'PGRST204')) {
+      console.warn(`⚠️ Supabase update(${id}): reintentando sin columnas descripcion/material...`);
+      const safeFields = { ...fields };
+      delete safeFields.descripcion;
+      delete safeFields.material;
+      const retry = await this.client
+        .from('productos')
+        .update(safeFields)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error(`Error en SupabaseProductRepository.update(${id}):`, error);
@@ -124,7 +154,7 @@ export class SupabaseProductRepository implements IProductRepository {
       total,
       activos,
       agotados,
-      categorias: uniqueCats || 4
+      categorias: uniqueCats || 5
     };
   }
 }
